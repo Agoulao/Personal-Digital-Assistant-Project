@@ -89,4 +89,4 @@ This will launch the graphical user interface, and you can begin interacting wit
 
 ## Current Limitations
 
-* **Portuguese Language Support:** While the framework allows for language switching, full Portuguese language implementation for all features is not yet complete.
+* **Portuguese Language Support:** While the framework allows for language switching, full Portuguese language implementation for all features is not yet complete and should be used.

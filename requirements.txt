@@ -1,0 +1,13 @@
+PyQt5
+SpeechRecognition
+PyAudio
+pyttsx3
+google-generativeai
+pyautogui
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+pytz
+python-dateutil
+requests
+openai

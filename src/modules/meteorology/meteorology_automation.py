@@ -19,7 +19,7 @@ class MeteorologyFunctionality(BaseAutomationModule):
         self.__base_url = "https://api.openweathermap.org"
         self.__geo_url = self.__base_url + "/geo/1.0"
         self.__data_url = self.__base_url + "/data/2.5"
-        self.__api_key = "2dfe045aea8c7c5e2f1b528367e0d22c"
+        self.__api_key = "YOUR_OPENWEATHERMAP_API_KEY"
         self.__units = {"metric": "°C", "imperial": "°F", "standard": "K"}
 
     def _api_key(self):

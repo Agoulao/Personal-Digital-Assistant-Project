@@ -18,11 +18,13 @@ This project presents a modular Windows desktop application designed to act as a
 
 * **Core Functionality Modules:**
 
-    * **Operating System Automation:** Manages files and folders (`pathlib`, `shutil`), and controls mouse and keyboard (`pyautogui`).
+  * **Operating System Automation:** Manages files and folders (`pathlib`, `shutil`) and controls mouse and keyboard (`pyautogui`).
 
-    * **Google Calendar Integration:** Manages events and appointments (`google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`, `pytz`, `dateutil`).
+  * **Google Calendar Integration:** Manages events and appointments (`google-api-python-client`, `google-auth`, `google-auth-httplib2`, `google-auth-oauthlib`, `pytz`, `dateutil`).
 
-    * **Schedule and Task Management:** Integrates with Google Calendar or other calendar API.
+  * **Gmail Integration:** Read, send, and manage emails via Gmail API.
+  
+  * **Schedule and Task Management:** Integrates with Google Calendar or other calendar APIs
 
 ## Setup and Installation
 

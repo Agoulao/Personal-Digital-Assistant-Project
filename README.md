@@ -2,9 +2,6 @@
 
 This project presents a modular Windows desktop application designed to act as a personal digital assistant. It supports both voice commands and text input, allowing users to interact with their computer and various online services through natural language. The core of the assistant is built with extensibility in mind, leveraging a pluggable Large Language Model (LLM) adapter and specialized functionality modules.
 
-## DISCLAIMER: 
-Weather API management is implemented in other author's project with the same objective: https://github.com/pataponjak3/Digital-Assistant-Project
-
 ## Features
 
 * **Natural Language Understanding:** Interprets user commands via an integrated LLM (Google Gemini API, Meta LLaMA).

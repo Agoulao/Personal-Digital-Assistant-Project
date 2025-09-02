@@ -5,59 +5,60 @@ import datetime # date/time operations
 import pytz # timezone handling
 from dateutil.relativedelta import relativedelta # date calculations
 
-from llm_client import parse_intents, generate_response, BASE_SYSTEM_PARSER
-from modules.system_automation import SystemAutomation
+from llm.llm_client import parse_intents, generate_response, update_system_chat_capabilities
 from modules.base_automation import BaseAutomationModule
+from config import Config 
 
 class Backend:
     def __init__(self, voice_module=None, tts_module=None):
         self.voice = voice_module
         self.tts = tts_module
-        self.last_filename = None
+
+        # Initialize conversation history for conversational responses
+        # This will store {"role": "user", "content": "..."} and {"role": "assistant", "content": "..."}
+        self.conversation_history = [] 
 
         self.automation_modules = []
         # Maps action name to (module_instance, method_name, description, example_json)
         self.supported_actions_map = {} 
         self.load_automation_modules() 
+        
+        # Update SYSTEM_CHAT with loaded module capabilities 
+        module_descriptions = [mod.get_description() for mod in self.automation_modules]
+        update_system_chat_capabilities(module_descriptions)
 
         self._update_system_parser_with_actions() 
         self.local_tz = pytz.timezone('Europe/Lisbon') # Initialize local timezone
 
     def load_automation_modules(self):
         """
-        Discovers and loads all automation modules from the 'modules' directory.
+        Loads automation modules based on paths defined in Config.ENABLED_MODULE_PATHS.
         """
-        modules_dir = os.path.join(os.path.dirname(__file__), 'modules')
-        if not os.path.exists(modules_dir):
-            print(f"WARNING: Modules directory '{modules_dir}' not found.")
-            return
-
-        for filename in os.listdir(modules_dir):
-            if filename.endswith('_automation.py') and filename != 'base_automation.py':
-                module_name = filename[:-3] # Remove .py extension
-                try:
-                    module = importlib.import_module(f"modules.{module_name}")
-                    
-                    for attr_name in dir(module):
-                        attr = getattr(module, attr_name)
-                        if isinstance(attr, type) and issubclass(attr, BaseAutomationModule) and attr is not BaseAutomationModule:
-                            module_instance = attr()
-                            self.automation_modules.append(module_instance)
-                            
-                            # Collect supported actions with their details
-                            for action_name, details in module_instance.get_supported_actions().items():
-                                if action_name in self.supported_actions_map:
-                                    print(f"WARNING: Duplicate action '{action_name}' found. First module takes precedence.")
-                                self.supported_actions_map[action_name] = (
-                                    module_instance, 
-                                    details["method_name"], 
-                                    details["description"], 
-                                    details["example_json"]
-                                )
-                            print(f"INFO: Loaded automation module: {module_name} ({module_instance.get_description()})")
-                            break
-                except Exception as e:
-                    print(f"ERROR: Failed to load automation module '{module_name}': {e}")
+        for module_path in Config.ENABLED_MODULES:
+            try:
+                module = importlib.import_module(module_path)
+                
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    # Check if it's a class, a subclass of BaseAutomationModule, and not BaseAutomationModule itself
+                    if isinstance(attr, type) and issubclass(attr, BaseAutomationModule) and attr is not BaseAutomationModule:
+                        module_instance = attr()
+                        self.automation_modules.append(module_instance)
+                        
+                        # Collect supported actions with their details
+                        for action_name, details in module_instance.get_supported_actions().items():
+                            if action_name in self.supported_actions_map:
+                                print(f"WARNING: Duplicate action '{action_name}' found. First module takes precedence.")
+                            self.supported_actions_map[action_name] = (
+                                module_instance, 
+                                details["method_name"], 
+                                details["description"], 
+                                details["example_json"]
+                            )
+                        print(f"INFO: Loaded automation module: {module_path} ({module_instance.get_description()})")
+                        break # Found the main module class in this file, move to next path
+            except Exception as e:
+                print(f"ERROR: Failed to load automation module '{module_path}': {e}")
 
         if not self.automation_modules:
             print("WARNING: No automation modules loaded. Only chat functionality will be available.")
@@ -123,33 +124,36 @@ class Backend:
             f"-------------------------"
         )
 
+        # Add user's message to conversation history for response generation
+        self.conversation_history.append({"role": "user", "content": user_text})
+
         try:
+            # parse_intents does NOT receive full conversation history for efficiency
             intents = parse_intents(
                 user_text, 
-                last_filename=self.last_filename,
                 available_actions_prompt=self.all_supported_actions_list_for_llm + current_context_for_llm # Add current context here
             )
         except Exception as e:
             print(f"Error parsing intents: {e}")
+            # If intent parsing fails, remove the last user message from history
+            if self.conversation_history and self.conversation_history[-1]["role"] == "user":
+                self.conversation_history.pop()
             return "Sorry, I didn't understand. Did you want me to run a command or chat?"
 
-        if intents and intents[0].get("action") == "clarify":
-            return intents[0].get("prompt", "Could you clarify your intent?")
-        elif intents and intents[0].get("action") == "clarify_file":
-            return intents[0].get("prompt", "Which file did you mean? Please specify the filename.")
-
         results = []
+        action_executed = False
 
         for it in intents:
             act = it.get("action")
             
             if act == "none":
-                continue
+                continue # Skip "none" actions, proceed to chat if no other actions
 
             if act not in self.supported_actions_map:
                 print(f"WARNING: Received unsupported action: {act}")
-                results = []
-                return f"Sorry, I don't know how to '{act.replace('_', ' ')}'."
+                response = f"Sorry, I don't know how to '{act.replace('_', ' ')}'."
+                self.conversation_history.append({"role": "assistant", "content": response})
+                return response
                 
             module_instance, method_name, _, _ = self.supported_actions_map[act]
             
@@ -159,35 +163,37 @@ class Backend:
                 method_to_call = getattr(module_instance, method_name)
                 result = method_to_call(**kwargs)
                 results.append(result)
-
-                if act == "create_file" and "File created" in result:
-                    self.last_filename = kwargs.get("filename")
-                elif act == "write_file" and "File written" in result:
-                    self.last_filename = kwargs.get("filename")
-                elif act == "delete_file" and self.last_filename == kwargs.get("filename") and "File deleted" in result:
-                    self.last_filename = None
+                action_executed = True
 
             except TypeError as te:
                 print(f"ERROR: Method '{method_name}' in module '{type(module_instance).__name__}' called with incorrect arguments for action '{act}'. Details: {te}")
-                return f"Sorry, I had trouble executing the command. Missing or incorrect arguments for '{act.replace('_', ' ')}'."
+                response = f"Sorry, I had trouble executing the command. Missing or incorrect arguments for '{act.replace('_', ' ')}'."
+                self.conversation_history.append({"role": "assistant", "content": response})
+                return response
             except Exception as e:
                 print(f"ERROR: Failed to execute action '{act}' from module '{type(module_instance).__name__}'. Details: {e}")
-                return f"Sorry, I encountered an error while trying to '{act.replace('_', ' ')}'."
+                response = f"Sorry, I encountered an error while trying to '{act.replace('_', ' ')}'."
+                self.conversation_history.append({"role": "assistant", "content": response})
+                return response
 
         if results:
-            return "\n".join(results)
-
-        return generate_response(user_text)
-
-    def run(self):
-        print("Backend running. Type 'exit' to quit.")
-        while True:
-            cmd = input("You: ")
-            if cmd.lower() in ("exit", "quit"):
-                break
-            print("Assistant:", self.process_command(cmd))
-
-
-if __name__ == "__main__":
-    backend = Backend()
-    backend.run()
+            final_response = "\n".join(results)
+            self.conversation_history.append({"role": "assistant", "content": final_response})
+            return final_response
+        elif not action_executed: # If no actions were executed (e.g., only "none" action was parsed)
+            # Generate a conversational response using the full history
+            response = generate_response(user_text, self.conversation_history) # Pass full history here
+            self.conversation_history.append({"role": "assistant", "content": response})
+            return response
+        
+        # Fallback if somehow no results and no chat response generated (shouldn't happen with the above logic)
+        response = "I'm not sure how to respond to that."
+        self.conversation_history.append({"role": "assistant", "content": response})
+        return response
+    
+    def clear_conversation_history(self):
+        """
+        Clears the stored conversation history.
+        """
+        self.conversation_history = []
+        print("INFO: Conversation history cleared.")

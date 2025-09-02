@@ -3,7 +3,7 @@
 import pyttsx3
 import threading
 import queue
-from config import Config
+from config import Config 
 
 class TTSBase:
     def speak(self, text):
@@ -21,6 +21,7 @@ class TTSModule(TTSBase):
         self._engine_ready_event = threading.Event()
         self.thread = threading.Thread(target=self._process_queue, daemon=True)
         self.thread.start()
+        # This will block the main thread until the TTS engine is initialized in the other thread.
         self._engine_ready_event.wait()
 
     def _process_queue(self):
@@ -45,22 +46,28 @@ class TTSModule(TTSBase):
                     break
         if not selected and voices:
             self.engine.setProperty('voice', voices[0].id)
+            
         self._engine_ready_event.set()
-
+        
         while True:
             text = self.queue.get()
-            if text is None:  # Exit signal if needed
+            if text is None: # Use None as a sentinel value to stop the thread
+                self.engine.endLoop()
                 break
+            
             self.engine.say(text)
             self.engine.runAndWait()
             self.queue.task_done()
-
+    
     def speak(self, text):
-        print(f"TTS speaking: {text}")
+        # Put the text to be spoken into the queue
         self.queue.put(text)
         
-    def set_voice(self, voice_index):
-        self.voice_index = voice_index
+    def stop(self):
+        # Use None to stop the queue processing loop
+        self.queue.put(None)
+        
+    def set_voice_by_index(self, voice_index):
         if hasattr(self, 'engine'):
             voices = self.engine.getProperty('voices')
             if 0 <= voice_index < len(voices):

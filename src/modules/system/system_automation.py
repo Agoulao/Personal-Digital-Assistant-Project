@@ -5,9 +5,8 @@ import subprocess
 import pyautogui
 from pathlib import Path
 from shutil import copy2
-import shutil
-
-from modules.base_automation import BaseAutomationModule
+import shutil 
+from modules.base_automation import BaseAutomationModule # Ensure this is imported
 
 # Decorator for safe execution and uniform error handling
 def safe_action(func):
@@ -30,7 +29,10 @@ class SystemAutomation(BaseAutomationModule):
         pyautogui.FAILSAFE = True  # Move mouse to top-left corner to abort
 
     def get_description(self) -> str:
-        return "Handles basic file management, application control, and mouse/keyboard interactions."
+        """
+        Returns a brief description of the module's capabilities for the LLM's conversational context.
+        """
+        return "perform system automation tasks such as listing, creating, reading, writing, moving, and deleting files and folders, launching applications, and controlling mouse and keyboard"
 
     def get_supported_actions(self) -> dict:
         """
@@ -49,8 +51,13 @@ class SystemAutomation(BaseAutomationModule):
             },
             "write_file": {
                 "method_name": "write_file",
-                "description": "Writes content to a file, creating it if it doesn't exist. The LLM should generate content directly.",
+                "description": "Writes content to a file, creating it if it doesn't exist. This action overwrites existing content.",
                 "example_json": '{"action":"write_file","filename":"myfile.txt","content":"Hello World"}'
+            },
+            "append_file": { 
+                "method_name": "append_file",
+                "description": "Appends content to an existing file. If the file does not exist, it will be created.",
+                "example_json": '{"action":"append_file","filename":"mylog.txt","content":"New log entry."}'
             },
             "read_file": {
                 "method_name": "read_file",
@@ -89,8 +96,8 @@ class SystemAutomation(BaseAutomationModule):
             },
             "open_application": {
                 "method_name": "open_application",
-                "description": "Opens an application at the given path.",
-                "example_json": '{"action":"open_application","path":"/Applications/Safari.app"}'
+                "description": "Opens an application by its full path or common name. On Windows, it tries to find the executable in PATH or uses shell execution.",
+                "example_json": '{"action":"open_application","path":"notepad.exe"}' 
             },
             "move_mouse": {
                 "method_name": "move_mouse",
@@ -133,9 +140,16 @@ class SystemAutomation(BaseAutomationModule):
     @safe_action
     def write_file(self, filename: str, content: str) -> str:
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
-        with open(filename, "w", encoding="utf-8") as f:
+        with open(filename, "w", encoding="utf-8") as f: # "w" mode overwrites
             f.write(content or "")
         return f"File written: {filename}"
+
+    @safe_action
+    def append_file(self, filename: str, content: str) -> str: 
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        with open(filename, "a", encoding="utf-8") as f: 
+            f.write(content or "")
+        return f"Content appended to file: {filename}"
 
     @safe_action
     def read_file(self, filename: str) -> str:
@@ -200,11 +214,22 @@ class SystemAutomation(BaseAutomationModule):
     # --- Application Control ---
     @safe_action
     def open_application(self, path: str) -> str:
-        if os.name == 'nt':
-            os.startfile(path)
+        # Windows-specific logic (since only Windows is used)
+        # 1. Try to find the executable in PATH
+        found_path = shutil.which(path)
+        if found_path:
+            try:
+                os.startfile(found_path)
+                return f"Launched application: {found_path}"
+            except Exception as e:
+                return f"Error launching '{found_path}' via os.startfile: {e}"
         else:
-            subprocess.Popen([path])
-        return f"Launched application: {path}"
+            # 2. If not found in PATH, try to launch directly via shell (relies on Windows' own lookup)
+            try:
+                os.startfile(path)
+                return f"Attempted to launch application: {path} (Windows shell lookup)"
+            except Exception as e:
+                return f"Could not find or launch application '{path}'. Please provide a full path or ensure it's in your system's PATH or a well-known Windows application. Error: {e}"
 
     # --- Mouse & Keyboard ---
     @safe_action
@@ -229,3 +254,4 @@ class SystemAutomation(BaseAutomationModule):
     def press_key(self, key: str) -> str:
         pyautogui.press(key)
         return f"Key pressed: {key}"
+

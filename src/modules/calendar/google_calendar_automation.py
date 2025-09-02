@@ -1,9 +1,11 @@
-######################################################################################################
-# IMPORTANT: Requires 'client_secret.json' from Google Calendar in the same directory as this module.
+################################################################################################################
+# IMPORTANT: Requires 'client_secret.json' from Google Calendar in the resources directory.
 # Navigate to Google Cloud Console, create a project, enable Calendar API,
+# add the following scope "https://www.googleapis.com/auth/calendar.events" in Google Auth Platform/Data access,
+# https://mail.google.com/ is also needed if gmail_automation.py is enabled
 # and download the OAuth 2.0 credentials as 'client_secret(...).json'.
-# Rename it to 'client_secret.json' and place it in the 'modules' directory.
-#######################################################################################################
+# Rename it to 'client_secret.json' and place it in the 'modules/resources' directory.
+#################################################################################################################
 
 
 import functools
@@ -56,8 +58,9 @@ class GoogleCalendarAutomation(BaseAutomationModule):
 
     def __init__(self):
         self.module_dir = os.path.dirname(os.path.abspath(__file__))
-        self.token_path = os.path.join(self.module_dir, 'token.json')
-        self.client_secret_path = os.path.join(self.module_dir, 'client_secret.json')
+        self.resources_dir = os.path.join(self.module_dir, '..', 'resources')
+        self.token_path = os.path.join(self.resources_dir, 'token.json')
+        self.client_secret_path = os.path.join(self.resources_dir, 'client_secret.json')
         
         self.local_tz = pytz.timezone('Europe/Lisbon') 
 
@@ -119,7 +122,10 @@ class GoogleCalendarAutomation(BaseAutomationModule):
 
 
     def get_description(self) -> str:
-        return "Manages events and appointments in Google Calendar."
+        """
+        Returns a brief description of the module's capabilities for the LLM's conversational context.
+        """
+        return "manage events and appointments in Google Calendar (list, create, and delete events)."
 
     def get_supported_actions(self) -> Dict[str, Dict[str, Any]]:
         if not self.is_authenticated:
@@ -228,8 +234,8 @@ class GoogleCalendarAutomation(BaseAutomationModule):
                     end_dt_local = end_dt_utc.astimezone(self.local_tz)
                     end_display = end_dt_local.strftime('%Y-%m-%d %H:%M')
                 else: # All-day event (date string)
-                    end_date_obj = datetime.datetime.fromisoformat(end).date() # This correctly gets a datetime.date object
-                    end_display = (end_date_obj - datetime.timedelta(days=1)).isoformat() # Corrected to show actual end day
+                    end_date_obj = datetime.datetime.fromisoformat(end).date()
+                    end_display = (end_date_obj - datetime.timedelta(days=1)).isoformat()
 
             except Exception as e:
                 start_display = start
@@ -269,15 +275,14 @@ class GoogleCalendarAutomation(BaseAutomationModule):
         else:
             # Specific time event: LLM provides INSEE-MM-DDTHH:MM:SS (local time)
             try:
-                # --- MODIFIED: Remove 'Z' if present before parsing ---
-                start_time_clean = start_time.replace('Z', '')
+                start_time_clean = start_time.replace('Z', '') # Remove 'Z' if present
                 # Parse as local datetime, then convert to UTC for Google Calendar
                 start_dt_local = self.local_tz.localize(datetime.datetime.fromisoformat(start_time_clean))
                 event['start'] = {'dateTime': start_dt_local.astimezone(pytz.utc).isoformat().replace('+00:00', 'Z')}
                 event['start']['timeZone'] = 'UTC' # Explicitly set timezone to UTC for Google if we're sending UTC datetime
 
                 if end_time:
-                    end_time_clean = end_time.replace('Z', '') # --- MODIFIED: Remove 'Z' if present ---
+                    end_time_clean = end_time.replace('Z', '') # Remove 'Z' if present
                     end_dt_local = self.local_tz.localize(datetime.datetime.fromisoformat(end_time_clean))
                     event['end'] = {'dateTime': end_dt_local.astimezone(pytz.utc).isoformat().replace('+00:00', 'Z')}
                     event['end']['timeZone'] = 'UTC'

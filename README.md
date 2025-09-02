@@ -53,17 +53,17 @@ Before running the application, you need to configure API keys for the LLM and o
 
     * For Google Gemini API, replace `"YOUR_GEMINI_API_KEY"` with your actual API key.
 
-    * If using other LLM providers (e.g., Awan, OpenAI, Scaleway, Hugging Face), ensure `LLM_PROVIDER` is set correctly and update their respective API keys.
+    * If using other LLM providers (e.g., Awan, Novita), ensure `[PROVIDER]_API_KEY` is set correctly and update their respective API keys.
 
-## Google Calendar Integration Setup
+## Google Calendar Integration and Gmail Setup
 
-For Google Calendar functionality, you need to obtain OAuth 2.0 credentials:
+For Google Calendar and Gmail functionality, you need to obtain OAuth 2.0 credentials:
 
-1.  **Navigate to Google Cloud Console:** `console.cloud.google.com`
+1.  **Navigate to Google Cloud Console:** `https://console.cloud.google.com`
 
 2.  **Create a new project** (or select an existing one).
 
-3.  **Enable the Google Calendar API** for your project.
+3.  **Enable the Google Calendar API and Gmail API** for your project.
 
 4.  **Create OAuth 2.0 Client ID credentials:**
 
@@ -75,18 +75,23 @@ For Google Calendar functionality, you need to obtain OAuth 2.0 credentials:
 
     * Download the generated `client_secret-<something>.json` file.
 
-5.  **Rename this downloaded file to `client_secret.json`** and place it in the `modules` directory of this project. This file is crucial for the application to authenticate with your Google Calendar.
+5.  **Rename this downloaded file to `client_secret.json`** and place it in the `modules` directory of this project. This file is crucial for the application to authenticate with your Google Calendar and Gmail.
+
+6.  **Add required OAuth scopes:**
+
+    * Go to **APIs & Services** > **OAuth consent screen**.  
+    * Under **Scopes**, click **Add or Remove Scopes**.  
+    * Add the following scopes:  
+      - `https://mail.google.com/` – Full Gmail access or another gmail scope if you don't want to give full permission
+      - `https://www.googleapis.com/auth/calendar.events` – Create, edit, and delete calendar events  
+    * Save changes.  
 
 ## Running the Application
 
-To start the Personal Digital Assistant, execute the `gui.py` file:
+To start the Personal Digital Assistant, execute the `main.py` file:
 
 ```bash
-python gui.py
+python main.py
 ```
 
 This will launch the graphical user interface, and you can begin interacting with the assistant via text input or voice commands (if your microphone is set up).
-
-## Current Limitations
-
-* **Portuguese Language Support:** While the framework allows for language switching, full Portuguese language implementation for all features is not yet complete and should be used.

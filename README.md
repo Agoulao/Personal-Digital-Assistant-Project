@@ -26,6 +26,8 @@ This project presents a modular Windows desktop application designed to act as a
   
   * **Schedule and Task Management:** Integrates with Google Calendar or other calendar APIs
 
+  * **Weather (OpenWeatherMap):** Current conditions, 5-day/3-hour forecast, and air pollution (AQI).
+
 ## Setup and Installation
 
 1.  **Clone the repository:**
